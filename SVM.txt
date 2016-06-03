@@ -1,0 +1,67 @@
+library(tm)
+library(plyr)
+library(class)
+library(caret)
+library(e1071)
+library(knitr)
+
+setwd("C:/Users/Killer/Desktop/SMS Spam Detection/smsspamcollection")
+
+rawdata <- read.table("data",sep="\t",header=FALSE,quote="",stringsAsFactors=FALSE)
+names(rawdata) <- c("Class","Message")
+
+NumberOfChar <- as.numeric(lapply(rawdata$Message,FUN=nchar))
+
+number.digits <- function(vect) {
+    length(as.numeric(unlist(strsplit(gsub("[^0-9]", "", unlist(vect)), ""))))
+}
+
+NumberOfDigits <- as.numeric(lapply(rawdata$Message,FUN=number.digits))
+
+clean.text = function(x)
+{ 
+  x = tolower(x)
+  x = gsub("[[:punct:]]", "", x)
+  x = gsub("[[:digit:]]", "", x)
+  x = gsub("[ |\t]{2,}", "", x)
+  x = gsub("^ ", "", x)
+  x = gsub(" $", "", x)
+  x = removeWords(x,stopwords("en"))
+  return(x)
+}
+cleanText <- clean.text(rawdata$Message)
+
+corpus <- Corpus(VectorSource(cleanText))
+
+tdm <- DocumentTermMatrix(corpus)
+
+tdm.df <- as.data.frame(data.matrix(tdm),stringsAsFactors=FALSE)
+
+tdm.new <- tdm.df[,colSums(tdm.df) > 2]
+
+cleandata <- cbind("Class" = rawdata$Class, NumberOfChar, NumberOfDigits, tdm.new)
+
+set.seed(1234)
+inTrain <- createDataPartition(cleandata$Class,p=0.8,list=FALSE)
+train <- cleandata[inTrain,]
+test <- cleandata[-inTrain,]
+
+## Linear Kernel
+svm.linear <- svm(Class~., data=train, scale=FALSE, kernel='linear')
+pred.linear <- predict(svm.linear, test[,-1])
+linear <- confusionMatrix(pred.linear,test$Class)
+
+## Linear Kernel
+svm.poly <- svm(Class~., data=train, scale=FALSE, kernel='polynomial')
+pred.poly <- predict(svm.poly, test[,-1])
+poly <- confusionMatrix(pred.poly,test$Class)
+
+## Radial Basis Kernel
+svm.radial <- svm(Class~., data=train, scale=FALSE, kernel='radial')
+pred.radial <- predict(svm.radial,test[,-1])
+radial <- confusionMatrix(pred.radial,test$Class)
+
+## Sigmoid Kernel
+svm.sigmoid <- svm(Class~., data=train, scale=FALSE, kernel='sigmoid')
+pred.sigmoid <- predict(svm.sigmoid,test[,-1])
+sigmoid <- confusionMatrix(pred.sigmoid,test$Class)

@@ -1,0 +1,64 @@
+ library("NLP")
+ library("slam")
+ library("tm")
+ library("e1071")
+ 
+ getwd()
+ setwd("C:/Users/Killer/Desktop/SMS Spam Detection/smsspamcollection")
+ data <- read.table("data", comment='', header=FALSE, quote=NULL, sep='\t')
+ sample_size <- floor(.75*nrow(data))
+ sample_data= sample(seq_len(nrow(data)), size=sample_size)
+ trainingData <- data[sample_data,]
+ testingData <- data[-sample_data,]
+
+// Cleaning the training data
+
+ data <- Corpus(VectorSource(trainingData$V2))
+ data <- tm_map(data, removePunctuation)
+ data <- tm_map(data,content_transformer(tolower))
+ data <- tm_map(data, stripWhitespace) 
+ data <- tm_map(data,removeNumbers) 
+ data <- tm_map(data, removeWords, c("lol","a","u","r"))
+ data <- tm_map(data,stripWhitespace)
+ data <- tm_map(data, removeWords, stopwords("english"))
+
+ sms_dtm <- DocumentTermMatrix(data)
+ sms_dict <- findFreqTerms(sms_dtm, lowfreq=5)
+ sms_train <- DocumentTermMatrix(data, list(dictionary=sms_dict))
+
+// Cleaning the testing data
+
+ data1 <- Corpus(VectorSource(testingData$V2))
+ data1 <- tm_map(data1, removePunctuation)
+ data1 <- tm_map(data1,content_transformer(tolower))
+ data1 <- tm_map(data1, stripWhitespace) 
+ data1 <- tm_map(data1,removeNumbers) 
+ data1 <- tm_map(data1, removeWords, c("lol","a","u","r"))
+ data1 <- tm_map(data1,stripWhitespace)
+ data1 <- tm_map(data1, removeWords, stopwords("english"))
+ 
+ sms_test_dtm <- DocumentTermMatrix(data1)
+ sms_test_dict <- findFreqTerms(sms_test_dtm, lowfreq=5)
+ sms_test <- DocumentTermMatrix(data1, list(dictionary=sms_test_dict))
+
+convert_counts <- function(x) {
+    x <- ifelse(x > 0, 1, 0)
+    x <- factor(x, levels = c(0, 1), labels = c("Absent", "Present"))
+}
+
+
+sms_train <- apply(sms_train, 2, convert_counts)
+sms_test <- apply(sms_test, 2, convert_counts)
+
+// Applying NB using e1071 package
+
+sms_classifier <- naiveBayes(sms_train, factor(trainingData$V1))
+sms_test_pred <- predict(sms_classifier, newdata=sms_test)  // Final results 
+
+//Checking and tabulating the results
+
+sms_test_pred
+table(sms_test_pred, testingData$V1)
+
+
+
